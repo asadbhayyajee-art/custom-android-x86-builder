@@ -36,7 +36,7 @@ jobs:
           git config --global user.name "GitHub Runner"
           mkdir -p ~/android-x86
           cd ~/android-x86
-          repo init -u https://github.com/android-x86/manifest.git -b q-x86
+          repo init -u https://github.com/android-x86/manifest.git -b pie-x86
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject libndk (ARM Translation Bridge)
