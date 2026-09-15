@@ -1,4 +1,4 @@
-name: Build Custom Lineage-x86 ISO (libndk + VirGL + VBox)
+name: Build Custom Android-x86 ISO (libndk + VirGL + VBox)
 
 on:
   workflow_dispatch:
@@ -30,18 +30,18 @@ jobs:
           chmod a+rx ~/.bin/repo
           echo "$HOME/.bin" >> $GITHUB_PATH
 
-      - name: Configure Git Identity & Sync Lineage-x86 Source
+      - name: Configure Git Identity & Sync Android-x86 Source
         run: |
           git config --global user.email "builder@runner.local"
           git config --global user.name "GitHub Runner"
-          mkdir -p ~/lineage-x86
-          cd ~/lineage-x86
-          repo init -u https://github.com/android-x86/manifest.git -b lineage-17.1-r2
+          mkdir -p ~/android-x86
+          cd ~/android-x86
+          repo init -u https://github.com/android-x86/manifest.git -b q-x86
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject libndk (ARM Translation Bridge)
         run: |
-          cd ~/lineage-x86
+          cd ~/android-x86
           mkdir -p vendor/redroid/nativebridge
           wget https://github.com/remote-android/redroid-doc/releases/download/v0.0.1/libndk_translation.tar.gz -O /tmp/libndk.tar.gz
           tar -xvf /tmp/libndk.tar.gz -C vendor/redroid/nativebridge/
@@ -54,7 +54,7 @@ jobs:
 
       - name: Inject VirtualBox Drivers & USB 2.0/3.0 Configs
         run: |
-          cd ~/lineage-x86
+          cd ~/android-x86
           KERNEL_CONFIG="kernel/arch/x86/configs/x86_64_defconfig"
           if [ -f "$KERNEL_CONFIG" ]; then
             echo "CONFIG_VBOXGUEST=y" >> $KERNEL_CONFIG
@@ -65,21 +65,21 @@ jobs:
 
       - name: Configure Mesa VirGL & Graphics Pipeline
         run: |
-          cd ~/lineage-x86
+          cd ~/android-x86
           BOARD_CONFIG="device/generic/common/BoardConfig.mk"
           echo "USE_OPENGL_RENDERER := true" >> $BOARD_CONFIG
           echo "BOARD_GPU_DRIVERS := virgl mesa3d" >> $BOARD_CONFIG
           echo "NUM_FRAME_BUFFERS := 3" >> $BOARD_CONFIG
 
-      - name: Build Lineage-x86 ISO Image
+      - name: Build Android-x86 ISO Image
         run: |
-          cd ~/lineage-x86
+          cd ~/android-x86
           source build/envsetup.sh
-          lunch lineage_x86_64-userdebug
+          lunch android_x86_64-userdebug
           m -j$(nproc) iso_img
 
-      - name: Upload Custom Lineage ISO
+      - name: Upload Custom ISO
         uses: actions/upload-artifact@v4
         with:
-          name: custom-lineage-x86-libndk-iso
-          path: ~/lineage-x86/out/target/product/x86_64/*.iso
+          name: custom-android-x86-libndk-iso
+          path: ~/android-x86/out/target/product/x86_64/*.iso
