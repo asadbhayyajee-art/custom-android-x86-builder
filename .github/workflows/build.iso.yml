@@ -36,7 +36,7 @@ jobs:
           git config --global user.name "GitHub Runner"
           mkdir -p ~/lineage-x86
           cd ~/lineage-x86
-          repo init -u https://github.com/android-x86/manifest.git -b lineage-17.1
+          repo init -u https://github.com/android-x86/manifest.git -b lineage-17.1-r2
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject libndk (ARM Translation Bridge)
