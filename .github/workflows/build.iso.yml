@@ -1,0 +1,83 @@
+name: Build Custom Lineage-x86 ISO (libndk + VirGL + VBox)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Free Up Runner Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git repo bc bison build-essential ccache curl flex g++-multilib \
+            gcc-multilib gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev \
+            liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop \
+            pngcrush rsync schedtool squashfs-tools xsltproc yasm zlib1g-dev wget
+
+      - name: Initialize Lineage-x86 Source Tree
+        run: |
+          mkdir -p ~/lineage-x86
+          cd ~/lineage-x86
+          repo init -u https://github.com/android-x86/manifest.git -b lineage-20
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+
+      - name: Inject libndk (ARM Translation Bridge)
+        run: |
+          cd ~/lineage-x86
+          # Fetch and configure libndk translation libraries into system overlay
+          mkdir -p vendor/redroid/nativebridge
+          wget https://github.com/remote-android/redroid-doc/releases/download/v0.0.1/libndk_translation.tar.gz -O /tmp/libndk.tar.gz
+          tar -xvf /tmp/libndk.tar.gz -C vendor/redroid/nativebridge/
+          
+          # Inject Native Bridge system properties
+          PRODUCT_OUT_DIR="device/generic/common"
+          echo "PRODUCT_PROPERTY_OVERRIDES += \\" >> $PRODUCT_OUT_DIR/device.mk
+          echo "    ro.enable.native.bridge=1 \\" >> $PRODUCT_OUT_DIR/device.mk
+          echo "    ro.dalvik.vm.isa.arm=x86 \\" >> $PRODUCT_OUT_DIR/device.mk
+          echo "    ro.dalvik.vm.isa.arm64=x86_64" >> $PRODUCT_OUT_DIR/device.mk
+
+      - name: Inject VirtualBox Drivers & USB 2.0/3.0 Configs
+        run: |
+          cd ~/lineage-x86
+          # Enable VirtualBox Guest additions, Shared Folders, USB EHCI/xHCI drivers in kernel config
+          KERNEL_CONFIG="kernel/arisc/arch/x86/configs/x86_64_defconfig"
+          if [ -f "$KERNEL_CONFIG" ]; then
+            echo "CONFIG_VBOXGUEST=y" >> $KERNEL_CONFIG
+            echo "CONFIG_VBOXSF=y" >> $KERNEL_CONFIG
+            echo "CONFIG_USB_EHCI_HCD=y" >> $KERNEL_CONFIG
+            echo "CONFIG_USB_XHCI_HCD=y" >> $KERNEL_CONFIG
+          fi
+
+      - name: Configure Mesa VirGL & Graphics Pipeline
+        run: |
+          cd ~/lineage-x86
+          # Force VirGL hardware graphics driver targets for VirtualBox VMSVGA
+          BOARD_CONFIG="device/generic/common/BoardConfig.mk"
+          echo "USE_OPENGL_RENDERER := true" >> $BOARD_CONFIG
+          echo "BOARD_GPU_DRIVERS := virgl mesa3d" >> $BOARD_CONFIG
+          echo "NUM_FRAME_BUFFERS := 3" >> $BOARD_CONFIG
+
+      - name: Build Lineage-x86 ISO Image
+        run: |
+          cd ~/lineage-x86
+          source build/envsetup.sh
+          lunch lineage_x86_64-userdebug
+          m -j$(nproc) iso_img
+
+      - name: Upload Custom Lineage ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom-lineage-x86-libndk-iso
+          path: ~/lineage-x86/out/target/product/x86_64/*.iso
