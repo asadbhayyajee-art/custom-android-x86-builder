@@ -30,11 +30,13 @@ jobs:
           chmod a+rx ~/.bin/repo
           echo "$HOME/.bin" >> $GITHUB_PATH
 
-      - name: Initialize Lineage-x86 Source Tree
+      - name: Configure Git Identity & Sync Lineage-x86 Source
         run: |
+          git config --global user.email "builder@runner.local"
+          git config --global user.name "GitHub Runner"
           mkdir -p ~/lineage-x86
           cd ~/lineage-x86
-          repo init -u https://github.com/android-x86/manifest.git -b lineage-20
+          repo init -u https://github.com/android-x86/manifest.git -b lineage-17.1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject libndk (ARM Translation Bridge)
@@ -53,7 +55,7 @@ jobs:
       - name: Inject VirtualBox Drivers & USB 2.0/3.0 Configs
         run: |
           cd ~/lineage-x86
-          KERNEL_CONFIG="kernel/arisc/arch/x86/configs/x86_64_defconfig"
+          KERNEL_CONFIG="kernel/arch/x86/configs/x86_64_defconfig"
           if [ -f "$KERNEL_CONFIG" ]; then
             echo "CONFIG_VBOXGUEST=y" >> $KERNEL_CONFIG
             echo "CONFIG_VBOXSF=y" >> $KERNEL_CONFIG
