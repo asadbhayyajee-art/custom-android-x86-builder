@@ -18,13 +18,17 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           df -h
 
-      - name: Install Build Dependencies
+      - name: Install Build Dependencies & Setup Repo Tool
         run: |
           sudo apt-get update
-          sudo apt-get install -y git repo bc bison build-essential ccache curl flex g++-multilib \
-            gcc-multilib gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev \
-            liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop \
-            pngcrush rsync schedtool squashfs-tools xsltproc yasm zlib1g-dev wget
+          sudo apt-get install -y git bc bison build-essential ccache curl flex g++-multilib \
+            gcc-multilib gnupg gperf imagemagick lib32z1-dev liblz4-tool libncurses-dev \
+            libsdl2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool \
+            squashfs-tools xsltproc yasm zlib1g-dev wget python3
+          mkdir -p ~/.bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+          chmod a+rx ~/.bin/repo
+          echo "$HOME/.bin" >> $GITHUB_PATH
 
       - name: Initialize Lineage-x86 Source Tree
         run: |
@@ -36,12 +40,10 @@ jobs:
       - name: Inject libndk (ARM Translation Bridge)
         run: |
           cd ~/lineage-x86
-          # Fetch and configure libndk translation libraries into system overlay
           mkdir -p vendor/redroid/nativebridge
           wget https://github.com/remote-android/redroid-doc/releases/download/v0.0.1/libndk_translation.tar.gz -O /tmp/libndk.tar.gz
           tar -xvf /tmp/libndk.tar.gz -C vendor/redroid/nativebridge/
           
-          # Inject Native Bridge system properties
           PRODUCT_OUT_DIR="device/generic/common"
           echo "PRODUCT_PROPERTY_OVERRIDES += \\" >> $PRODUCT_OUT_DIR/device.mk
           echo "    ro.enable.native.bridge=1 \\" >> $PRODUCT_OUT_DIR/device.mk
@@ -51,7 +53,6 @@ jobs:
       - name: Inject VirtualBox Drivers & USB 2.0/3.0 Configs
         run: |
           cd ~/lineage-x86
-          # Enable VirtualBox Guest additions, Shared Folders, USB EHCI/xHCI drivers in kernel config
           KERNEL_CONFIG="kernel/arisc/arch/x86/configs/x86_64_defconfig"
           if [ -f "$KERNEL_CONFIG" ]; then
             echo "CONFIG_VBOXGUEST=y" >> $KERNEL_CONFIG
@@ -63,7 +64,6 @@ jobs:
       - name: Configure Mesa VirGL & Graphics Pipeline
         run: |
           cd ~/lineage-x86
-          # Force VirGL hardware graphics driver targets for VirtualBox VMSVGA
           BOARD_CONFIG="device/generic/common/BoardConfig.mk"
           echo "USE_OPENGL_RENDERER := true" >> $BOARD_CONFIG
           echo "BOARD_GPU_DRIVERS := virgl mesa3d" >> $BOARD_CONFIG
